@@ -3,48 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Web Communication App</title>
+    <title>Media Web Chat Application</title>
     <style>
-        body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f9; }
-        #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
-        #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
-        #input:focus { outline: none; }
-        #form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; cursor: pointer; font-weight: bold; }
-        #messages { list-style-type: none; margin: 0; padding: 0; }
-        #messages > li { padding: 0.5rem 1rem; background: #fff; margin: 0.5rem; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); word-wrap: break-word; }
-        #messages > li:nth-child(odd) { background: #eef2ff; }
-        #setup { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-        #setup input { padding: 0.5rem; font-size: 1rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 4px; }
-        #setup button { padding: 0.5rem 1rem; font-size: 1rem; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        body { margin: 0; padding-bottom: 4.5rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f0f2f5; }
+        #form { background: #ffffff; padding: 0.5rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 0.5rem; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+        .input-row { display: flex; width: 100%; gap: 0.5rem; align-items: center; }
+        #input { border: 1px solid #ccc; padding: 0.5rem 1rem; flex-grow: 1; border-radius: 1.5rem; outline: none; font-size: 1rem; }
+        .btn { border: none; padding: 0.5rem 1rem; border-radius: 1.5rem; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: background 0.2s; }
+        .btn-send { background: #007bff; color: white; }
+        .btn-media { background: #e4e6eb; color: #050505; }
+        .btn-mic { background: #dc3545; color: white; }
+        .btn-mic.recording { background: #28a745; animation: pulse 1.5s infinite; }
+        #messages { list-style-type: none; margin: 0; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+        #messages > li { padding: 0.75rem 1rem; background: #fff; border-radius: 0.75rem; max-width: 70%; width: fit-content; box-shadow: 0 1px 2px rgba(0,0,0,0.1); word-wrap: break-word; }
+        #messages > li.my-msg { align-self: flex-end; background: #d9fdd3; }
+        .chat-media { max-width: 100%; max-height: 250px; border-radius: 0.5rem; margin-top: 0.5rem; display: block; }
+        audio.chat-media { height: 40px; }
+        #setup { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #fff; }
+        #setup input { padding: 0.75rem; font-size: 1rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 0.5rem; width: 250px; }
         #chat-room { display: none; }
+        #file-input { display: none; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <!-- Step 1: Choose a Username -->
+    <!-- Login Area -->
     <div id="setup">
-        <h2>Enter your name to start communicating</h2>
+        <h2>Enter your name to join</h2>
         <input type="text" id="username" placeholder="Your name..." autocomplete="off" />
-        <button onclick="startChat()">Join Chat</button>
+        <button class="btn btn-send" onclick="startChat()">Join Chat Room</button>
     </div>
 
-    <!-- Step 2: The actual Chat Area -->
+    <!-- Main Chat Window -->
     <div id="chat-room">
         <ul id="messages"></ul>
+        
         <form id="form" action="">
-            <input id="input" autocomplete="off" placeholder="Type a message..." /><button>Send</button>
+            <div class="input-row">
+                <!-- Media Upload and Mic Hooks -->
+                <button type="button" class="btn btn-media" onclick="triggerFileInput()">📁 File</button>
+                <button type="button" id="mic-btn" class="btn btn-mic" onclick="toggleRecording()">🎤 Record</button>
+                
+                <input type="file" id="file-input" accept="image/*,video/*" onchange="handleFileSelect(event)" />
+                <input id="input" autocomplete="off" placeholder="Type a message..." />
+                <button class="btn btn-send">Send</button>
+            </div>
         </form>
     </div>
 
-    <!-- Load the socket.io client script automatically provided by the server -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let myUsername = "";
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
 
         const form = document.getElementById('form');
         const input = document.getElementById('input');
         const messages = document.getElementById('messages');
+        const fileInput = document.getElementById('file-input');
+        const micBtn = document.getElementById('mic-btn');
 
         function startChat() {
             const nameInput = document.getElementById('username').value.trim();
@@ -52,29 +72,137 @@
                 myUsername = nameInput;
                 document.getElementById('setup').style.display = 'none';
                 document.getElementById('chat-room').style.display = 'block';
+                window.scrollTo(0, document.body.scrollHeight);
             }
         }
 
-        // Handle sending messages
+        function triggerFileInput() {
+            fileInput.click();
+        }
+
+        // Process Image/Video upload and turn into text string data
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const mediaType = file.type.startsWith('image/') ? 'image' : 'video';
+                socket.emit('chat message', {
+                    user: myUsername,
+                    text: input.value || `Shared a ${mediaType}`,
+                    media: e.target.result,
+                    mediaType: mediaType
+                });
+                input.value = '';
+                fileInput.value = ''; // reset file input element
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Handle Voice Notes capturing
+        async function toggleRecording() {
+            if (!isRecording) {
+                // Request mic access permissions
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                            socket.emit('chat message', {
+                                user: myUsername,
+                                text: 'Voice note',
+                                media: reader.result,
+                                mediaType: 'audio'
+                            });
+                        };
+                        reader.readAsDataURL(audioBlob);
+                        
+                        // Shut down the mic track after finishing
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    micBtn.textContent = "🛑 Stop";
+                    micBtn.classList.add('recording');
+                } catch (err) {
+                    alert('Could not access microphone: ' + err.message);
+                }
+            } else {
+                mediaRecorder.stop();
+                isRecording = false;
+                micBtn.textContent = "🎤 Record";
+                micBtn.classList.remove('recording');
+            }
+        }
+
+        // Send Text Data Form Submission
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             if (input.value.trim()) {
-                const messageData = {
+                socket.emit('chat message', {
                     user: myUsername,
-                    text: input.value
-                };
-                // Emit event to server
-                socket.emit('chat message', messageData);
+                    text: input.value,
+                    media: null,
+                    mediaType: null
+                });
                 input.value = '';
             }
         });
 
-        // Handle receiving messages
-        socket.on('chat message', (data) => {
+        // Interface Rendering Core Logic
+        function appendMessage(data) {
             const item = document.createElement('li');
-            item.innerHTML = `<strong>${data.user}:</strong> ${data.text}`;
+            
+            // Align your text nicely to the right side of the screen
+            if (data.user === myUsername) {
+                item.classList.add('my-msg');
+            }
+            
+            item.innerHTML = `<strong>${data.user}:</strong> <span>${data.text}</span>`;
+
+            // Evaluate if rich media is inside the message data
+            if (data.media && data.mediaType) {
+                if (data.mediaType === 'image') {
+                    const img = document.createElement('img');
+                    img.src = data.media;
+                    img.classList.add('chat-media');
+                    item.appendChild(img);
+                } else if (data.mediaType === 'video') {
+                    const video = document.createElement('video');
+                    video.src = data.media;
+                    video.controls = true;
+                    video.classList.add('chat-media');
+                    item.appendChild(video);
+                } else if (data.mediaType === 'audio') {
+                    const audio = document.createElement('audio');
+                    audio.src = data.media;
+                    audio.controls = true;
+                    audio.classList.add('chat-media');
+                    item.appendChild(audio);
+                }
+            }
+
             messages.appendChild(item);
             window.scrollTo(0, document.body.scrollHeight);
+        }
+
+        socket.on('load history', (history) => {
+            messages.innerHTML = '';
+            history.forEach(msg => appendMessage(msg));
+        });
+
+        socket.on('chat message', (data) => {
+            appendMessage(data);
         });
     </script>
 </body>
