@@ -2,27 +2,59 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Persistent Media Web Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mobile Responsive Media Chat</title>
     <style>
-        body { margin: 0; padding-bottom: 5rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f0f2f5; }
-        #form { background: #ffffff; padding: 0.5rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 0.5rem; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
-        .input-row { display: flex; width: 100%; gap: 0.5rem; align-items: center; }
-        #input { border: 1px solid #ccc; padding: 0.5rem 1rem; flex-grow: 1; border-radius: 1.5rem; outline: none; font-size: 1rem; }
-        .btn { border: none; padding: 0.5rem 1rem; border-radius: 1.5rem; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: background 0.2s; }
-        .btn-send { background: #007bff; color: white; }
+        /* Base Setup */
+        body { margin: 0; padding-bottom: 6.5rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; -webkit-tap-highlight-color: transparent; }
+        
+        /* Central Login Screen */
+        #setup { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #ffffff; padding: 20px; box-sizing: border-box; }
+        #setup h2 { font-size: 1.5rem; color: #333; text-align: center; margin-bottom: 1.5rem; }
+        #setup input { padding: 0.85rem; font-size: 1rem; margin-bottom: 1rem; border: 1px solid #ccd0d5; border-radius: 0.5rem; width: 100%; max-width: 300px; box-sizing: border-box; outline: none; }
+        
+        /* Interactive Chat Screen Container */
+        #chat-room { display: none; width: 100%; max-width: 800px; margin: 0 auto; box-sizing: border-box; }
+        
+        /* Message Stream Bubble Array Layout */
+        #messages { list-style-type: none; margin: 0; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; box-sizing: border-box; }
+        #messages > li { padding: 0.65rem 0.9rem; background: #ffffff; border-radius: 0.75rem; max-width: 85%; width: fit-content; box-shadow: 0 1px 2px rgba(0,0,0,0.08); word-wrap: break-word; font-size: 0.95rem; line-height: 1.4; color: #1c1e21; }
+        #messages > li.my-msg { align-self: flex-end; background: #d9fdd3; color: #111b21; }
+        
+        /* Media Attachment Fluid Auto Sizing */
+        .chat-media { max-width: 100%; max-height: 220px; border-radius: 0.5rem; margin-top: 0.5rem; display: block; object-fit: contain; }
+        audio.chat-media { width: 100%; max-width: 240px; height: 40px; }
+        
+        /* Bottom Control Panel Floating Dock */
+        #form { background: #ffffff; padding: 0.5rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 0.25rem; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); box-sizing: border-box; z-index: 1000; }
+        .input-row { display: flex; width: 100%; gap: 0.4rem; align-items: center; box-sizing: border-box; }
+        #input { border: 1px solid #ccd0d5; padding: 0.6rem 1rem; flex-grow: 1; border-radius: 1.5rem; outline: none; font-size: 1rem; background: #f0f2f5; box-sizing: border-box; }
+        
+        /* Dynamic Typing Indicator Tracker Styling */
+        #typing-indicator { font-size: 0.8rem; color: #65676b; min-height: 1.1rem; padding-left: 0.5rem; font-style: italic; }
+        
+        /* Adaptive Universal Button Classes */
+        .btn { border: none; padding: 0.6rem 0.85rem; border-radius: 1.5rem; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: background 0.2s, transform 0.1s; display: inline-flex; align-items: center; justify-content: center; user-select: none; }
+        .btn:active { transform: scale(0.96); }
+        .btn-send { background: #007bff; color: white; padding-left: 1.2rem; padding-right: 1.2rem; }
         .btn-media { background: #e4e6eb; color: #050505; }
         .btn-mic { background: #dc3545; color: white; }
         .btn-mic.recording { background: #28a745; animation: pulse 1.5s infinite; }
-        #messages { list-style-type: none; margin: 0; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
-        #messages > li { padding: 0.75rem 1rem; background: #fff; border-radius: 0.75rem; max-width: 70%; width: fit-content; box-shadow: 0 1px 2px rgba(0,0,0,0.1); word-wrap: break-word; }
-        #messages > li.my-msg { align-self: flex-end; background: #d9fdd3; }
-        .chat-media { max-width: 100%; max-height: 250px; border-radius: 0.5rem; margin-top: 0.5rem; display: block; }
-        audio.chat-media { height: 40px; }
-        #setup { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #fff; }
-        #setup input { padding: 0.75rem; font-size: 1rem; margin-bottom: 1rem; border: 1px solid #ccc; border-radius: 0.5rem; width: 250px; }
-        #chat-room { display: none; }
         #file-input { display: none; }
+
+        /* ADVANCED SMARTPHONE VIEWPORT MEDIA ADAPTATION QUERY HOOKS */
+        @media (max-width: 480px) {
+            body { padding-bottom: 6rem; }
+            #messages { padding: 0.75rem; gap: 0.5rem; }
+            #messages > li { max-width: 90%; font-size: 0.9rem; padding: 0.5rem 0.75rem; }
+            #form { padding: 0.4rem; }
+            #input { padding: 0.5rem 0.85rem; font-size: 0.95rem; }
+            .btn { padding: 0.5rem 0.75rem; font-size: 0.85rem; border-radius: 1.2rem; }
+            .btn-send { padding-left: 1rem; padding-right: 1rem; }
+            .chat-media { max-height: 180px; }
+            audio.chat-media { max-width: 190px; }
+        }
+
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
@@ -40,12 +72,15 @@
         <ul id="messages"></ul>
         
         <form id="form" action="">
+            <!-- Real-time Typing Status Element -->
+            <div id="typing-indicator"></div>
+            
             <div class="input-row">
                 <button type="button" class="btn btn-media" onclick="triggerFileInput()">📁 Media</button>
                 <button type="button" id="mic-btn" class="btn btn-mic" onclick="toggleRecording()">🎤 Record</button>
                 
                 <input type="file" id="file-input" accept="image/*,video/*" onchange="handleFileSelect(event)" />
-                <input id="input" autocomplete="off" placeholder="Type a message..." />
+                <input id="input" autocomplete="off" placeholder="Type a message..." oninput="handleTypingEvent()" />
                 <button class="btn btn-send">Send</button>
             </div>
         </form>
@@ -58,12 +93,15 @@
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
+        let typingTimeout;
+        let isCurrentlyTyping = false;
 
         const form = document.getElementById('form');
         const input = document.getElementById('input');
         const messages = document.getElementById('messages');
         const fileInput = document.getElementById('file-input');
         const micBtn = document.getElementById('mic-btn');
+        const typingIndicator = document.getElementById('typing-indicator');
 
         function startChat() {
             const nameInput = document.getElementById('username').value.trim();
@@ -79,10 +117,22 @@
             fileInput.click();
         }
 
-        // Process images or video uploads into transferable text blocks
+        function handleTypingEvent() {
+            if (!isCurrentlyTyping) {
+                isCurrentlyTyping = true;
+                socket.emit('user typing', { user: myUsername, status: true });
+            }
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                isCurrentlyTyping = false;
+                socket.emit('user typing', { user: myUsername, status: false });
+            }, 2500);
+        }
+
         function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+            const file = files[0];
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -95,11 +145,13 @@
                 });
                 input.value = '';
                 fileInput.value = ''; 
+                clearTimeout(typingTimeout);
+                isCurrentlyTyping = false;
+                socket.emit('user typing', { user: myUsername, status: false });
             };
             reader.readAsDataURL(file);
         }
 
-        // Microphonic Recording Capture Module
         async function toggleRecording() {
             if (!isRecording) {
                 try {
@@ -139,7 +191,6 @@
             }
         }
 
-        // Send Text String
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             if (input.value.trim()) {
@@ -149,51 +200,3 @@
                     media: null,
                     mediaType: null
                 });
-                input.value = '';
-            }
-        });
-
-        // Universal dynamic data renderer
-        function appendMessage(data) {
-            const item = document.createElement('li');
-            if (data.user === myUsername) { item.classList.add('my-msg'); }
-            
-            item.innerHTML = `<strong>${data.user}:</strong> <span>${data.text}</span>`;
-
-            if (data.media && data.mediaType) {
-                if (data.mediaType === 'image') {
-                    const img = document.createElement('img');
-                    img.src = data.media;
-                    img.classList.add('chat-media');
-                    item.appendChild(img);
-                } else if (data.mediaType === 'video') {
-                    const video = document.createElement('video');
-                    video.src = data.media;
-                    video.controls = true;
-                    video.classList.add('chat-media');
-                    item.appendChild(video);
-                } else if (data.mediaType === 'audio') {
-                    const audio = document.createElement('audio');
-                    audio.src = data.media;
-                    audio.controls = true;
-                    audio.classList.add('chat-media');
-                    item.appendChild(audio);
-                }
-            }
-
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
-        }
-
-        // Load entire history loop from server automatically upon link generation
-        socket.on('load history', (history) => {
-            messages.innerHTML = '';
-            history.forEach(msg => appendMessage(msg));
-        });
-
-        socket.on('chat message', (data) => {
-            appendMessage(data);
-        });
-    </script>
-</body>
-</html>
