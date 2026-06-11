@@ -10,50 +10,38 @@ const io = new Server(server, {
     maxHttpBufferSize: 5e7 
 });
 
+// The central array storing your shared text and media messages
 let globalMessageHistory = [];
-// Keeps a dictionary list of all currently typing users
-let activeTypingList = {};
 
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
 io.on('connection', (socket) => {
-    // Keep track of the username associated with this specific connection slot
-    let sessionUser = "";
+    console.log('A user joined the conversation.');
 
+    // INSTANTLY send all saved past messages and media to the user who just connected
     socket.emit('load history', globalMessageHistory);
 
-    // Listens for active typing reports from the frontend
-    socket.on('user typing', (data) => {
-        sessionUser = data.user;
-        if (data.status) {
-            activeTypingList[data.user] = true;
-        } else {
-            delete activeTypingList[data.user];
-        }
-        // Broadcast the active list layout to everyone
-        io.emit('display typing', activeTypingList);
-    });
-
     socket.on('chat message', (data) => {
+        // Save the raw text or base64 media asset into history
         globalMessageHistory.push(data);
+        
+        // Limit history to the last 30 entries to preserve free tier server memory
         if (globalMessageHistory.length > 30) {
             globalMessageHistory.shift();
         }
+
+        // Broadcast the live update out to all open sessions
         io.emit('chat message', data);
     });
 
     socket.on('disconnect', () => {
-        // If a user disconnects mid-sentence, clean them up out of the typing array
-        if (sessionUser && activeTypingList[sessionUser]) {
-            delete activeTypingList[sessionUser];
-            io.emit('display typing', activeTypingList);
-        }
+        console.log('A user disconnected.');
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Typing Tracker Chat Server running on port ${PORT}`);
+    console.log(`Unified Media Chat Server running on port ${PORT}`);
 });
