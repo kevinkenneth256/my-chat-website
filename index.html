@@ -105,8 +105,9 @@
 
         // Process images or video uploads into transferable text blocks
         function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
+            const file = files[0];
 
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -186,30 +187,32 @@
         });
 
         // Universal dynamic data renderer
+        styleMsg = (item, data) => {
+            item.innerHTML = `<strong>${data.user}:</strong> <span>${data.text}</span>`;
+            if (data.media && data.mediaType) {
+                let el;
+                if (data.mediaType === 'image') {
+                    el = document.createElement('img');
+                } else if (data.mediaType === 'video') {
+                    el = document.createElement('video');
+                    el.controls = true;
+                } else if (data.mediaType === 'audio') {
+                    el = document.createElement('audio');
+                    el.controls = true;
+                }
+                if (el) {
+                    el.src = data.media;
+                    el.classList.add('chat-media');
+                    item.appendChild(el);
+                }
+            }
+        };
+
         function appendMessage(data) {
             const item = document.createElement('li');
             if (data.user === myUsername) { item.classList.add('my-msg'); }
-            
-            item.innerHTML = `<strong>${data.user}:</strong> <span>${data.text}</span>`;
-
-            if (data.media && data.mediaType) {
-                if (data.mediaType === 'image') {
-                    const img = document.createElement('img');
-                    img.src = data.media;
-                    img.classList.add('chat-media');
-                    item.appendChild(img);
-                } else if (data.mediaType === 'video') {
-                    const video = document.createElement('video');
-                    video.src = data.media;
-                    video.controls = true;
-                    video.classList.add('chat-media');
-                    item.appendChild(video);
-                } else if (data.mediaType === 'audio') {
-                    const audio = document.createElement('audio');
-                    audio.src = data.media;
-                    audio.controls = true;
-                    audio.classList.add('chat-media');
-                    item.appendChild(audio);
-                }
-            }
+            styleMsg(item, data);
+            messages.appendChild(item);
+            window.scrollTo(0, document.body.scrollHeight);
+        }
 
