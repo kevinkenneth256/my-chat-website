@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Media Web Chat Application</title>
+    <title>Persistent Media Web Chat with Typing Status</title>
     <style>
-        body { margin: 0; padding-bottom: 4.5rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f0f2f5; }
-        #form { background: #ffffff; padding: 0.5rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 0.5rem; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+        body { margin: 0; padding-bottom: 6rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background-color: #f0f2f5; }
+        #form { background: #ffffff; padding: 0.5rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; flex-direction: column; gap: 0.25rem; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
         .input-row { display: flex; width: 100%; gap: 0.5rem; align-items: center; }
         #input { border: 1px solid #ccc; padding: 0.5rem 1rem; flex-grow: 1; border-radius: 1.5rem; outline: none; font-size: 1rem; }
         .btn { border: none; padding: 0.5rem 1rem; border-radius: 1.5rem; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: background 0.2s; }
@@ -14,6 +14,7 @@
         .btn-media { background: #e4e6eb; color: #050505; }
         .btn-mic { background: #dc3545; color: white; }
         .btn-mic.recording { background: #28a745; animation: pulse 1.5s infinite; }
+        #typing-indicator { font-size: 0.85rem; color: #65676b; min-height: 1.2rem; padding-left: 0.7rem; font-style: italic; }
         #messages { list-style-type: none; margin: 0; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         #messages > li { padding: 0.75rem 1rem; background: #fff; border-radius: 0.75rem; max-width: 70%; width: fit-content; box-shadow: 0 1px 2px rgba(0,0,0,0.1); word-wrap: break-word; }
         #messages > li.my-msg { align-self: flex-end; background: #d9fdd3; }
@@ -28,25 +29,27 @@
 </head>
 <body>
 
-    <!-- Login Area -->
+    <!-- Access Gateway Container -->
     <div id="setup">
-        <h2>Enter your name to join</h2>
+        <h2>Enter your name to join communication channel</h2>
         <input type="text" id="username" placeholder="Your name..." autocomplete="off" />
-        <button class="btn btn-send" onclick="startChat()">Join Chat Room</button>
+        <button class="btn btn-send" onclick="startChat()">Join Chatroom</button>
     </div>
 
-    <!-- Main Chat Window -->
+    <!-- Active Communication Room Dashboard -->
     <div id="chat-room">
         <ul id="messages"></ul>
         
         <form id="form" action="">
+            <!-- Real-time Typing Status Element -->
+            <div id="typing-indicator"></div>
+            
             <div class="input-row">
-                <!-- Media Upload and Mic Hooks -->
-                <button type="button" class="btn btn-media" onclick="triggerFileInput()">📁 File</button>
+                <button type="button" class="btn btn-media" onclick="triggerFileInput()">📁 Media</button>
                 <button type="button" id="mic-btn" class="btn btn-mic" onclick="toggleRecording()">🎤 Record</button>
                 
                 <input type="file" id="file-input" accept="image/*,video/*" onchange="handleFileSelect(event)" />
-                <input id="input" autocomplete="off" placeholder="Type a message..." />
+                <input id="input" autocomplete="off" placeholder="Type a message..." oninput="handleTypingEvent()" />
                 <button class="btn btn-send">Send</button>
             </div>
         </form>
@@ -59,12 +62,15 @@
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
+        let typingTimeout;
+        let isCurrentlyTyping = false;
 
         const form = document.getElementById('form');
         const input = document.getElementById('input');
         const messages = document.getElementById('messages');
         const fileInput = document.getElementById('file-input');
         const micBtn = document.getElementById('mic-btn');
+        const typingIndicator = document.getElementById('typing-indicator');
 
         function startChat() {
             const nameInput = document.getElementById('username').value.trim();
@@ -80,7 +86,24 @@
             fileInput.click();
         }
 
-        // Process Image/Video upload and turn into text string data
+        // Monitors keystrokes and alerts the network server
+        function handleTypingEvent() {
+            if (!isCurrentlyTyping) {
+                isCurrentlyTyping = true;
+                socket.emit('user typing', { user: myUsername, status: true });
+            }
+
+            // Clear previous countdown timers
+            clearTimeout(typingTimeout);
+
+            // Wait 2.5 seconds of total silence before turning status off
+            typingTimeout = setTimeout(() => {
+                isCurrentlyTyping = false;
+                socket.emit('user typing', { user: myUsername, status: false });
+            }, 2500);
+        }
+
+        // Process images or video uploads into transferable text blocks
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -95,23 +118,24 @@
                     mediaType: mediaType
                 });
                 input.value = '';
-                fileInput.value = ''; // reset file input element
+                fileInput.value = ''; 
+                // Stop typing message instantly upon submission
+                clearTimeout(typingTimeout);
+                isCurrentlyTyping = false;
+                socket.emit('user typing', { user: myUsername, status: false });
             };
             reader.readAsDataURL(file);
         }
 
-        // Handle Voice Notes capturing
+        // Microphonic Recording Capture Module
         async function toggleRecording() {
             if (!isRecording) {
-                // Request mic access permissions
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                     mediaRecorder = new MediaRecorder(stream);
                     audioChunks = [];
 
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
+                    mediaRecorder.ondataavailable = event => { audioChunks.push(event.data); };
 
                     mediaRecorder.onstop = () => {
                         const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
@@ -125,8 +149,6 @@
                             });
                         };
                         reader.readAsDataURL(audioBlob);
-                        
-                        // Shut down the mic track after finishing
                         stream.getTracks().forEach(track => track.stop());
                     };
 
@@ -145,7 +167,7 @@
             }
         }
 
-        // Send Text Data Form Submission
+        // Send Text String
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             if (input.value.trim()) {
@@ -156,21 +178,20 @@
                     mediaType: null
                 });
                 input.value = '';
+                // Clear typing indicator instantly on submit
+                clearTimeout(typingTimeout);
+                isCurrentlyTyping = false;
+                socket.emit('user typing', { user: myUsername, status: false });
             }
         });
 
-        // Interface Rendering Core Logic
+        // Universal dynamic data renderer
         function appendMessage(data) {
             const item = document.createElement('li');
-            
-            // Align your text nicely to the right side of the screen
-            if (data.user === myUsername) {
-                item.classList.add('my-msg');
-            }
+            if (data.user === myUsername) { item.classList.add('my-msg'); }
             
             item.innerHTML = `<strong>${data.user}:</strong> <span>${data.text}</span>`;
 
-            // Evaluate if rich media is inside the message data
             if (data.media && data.mediaType) {
                 if (data.mediaType === 'image') {
                     const img = document.createElement('img');
@@ -192,18 +213,3 @@
                 }
             }
 
-            messages.appendChild(item);
-            window.scrollTo(0, document.body.scrollHeight);
-        }
-
-        socket.on('load history', (history) => {
-            messages.innerHTML = '';
-            history.forEach(msg => appendMessage(msg));
-        });
-
-        socket.on('chat message', (data) => {
-            appendMessage(data);
-        });
-    </script>
-</body>
-</html>
