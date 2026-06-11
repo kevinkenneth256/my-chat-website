@@ -10,62 +10,38 @@ const io = new Server(server, {
     maxHttpBufferSize: 5e7 
 });
 
+// The central array storing your shared text and media messages
 let globalMessageHistory = [];
-let activeTypingList = {};
-// NEW: Dictionary tracking online users map: [socket.id] -> username
-let onlineUsers = {};
 
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
 io.on('connection', (socket) => {
-    let sessionUser = "";
+    console.log('A user joined the conversation.');
 
-    // Send history instantly on connect
+    // INSTANTLY send all saved past messages and media to the user who just connected
     socket.emit('load history', globalMessageHistory);
 
-    // NEW: Listen for when a user successfully enters their name
-    socket.on('register user', (username) => {
-        sessionUser = username;
-        onlineUsers[socket.id] = username;
-        // Broadcast the updated online list to everyone
-        io.emit('update users', Object.values(onlineUsers));
-    });
-
-    // Listens for active typing reports from the frontend
-    socket.on('user typing', (data) => {
-        if (data.status) {
-            activeTypingList[data.user] = true;
-        } else {
-            delete activeTypingList[data.user];
-        }
-        io.emit('display typing', activeTypingList);
-    });
-
     socket.on('chat message', (data) => {
+        // Save the raw text or base64 media asset into history
         globalMessageHistory.push(data);
+        
+        // Limit history to the last 30 entries to preserve free tier server memory
         if (globalMessageHistory.length > 30) {
             globalMessageHistory.shift();
         }
+
+        // Broadcast the live update out to all open sessions
         io.emit('chat message', data);
     });
 
     socket.on('disconnect', () => {
-        // Clean up user from typing list if they leave mid-type
-        if (sessionUser && activeTypingList[sessionUser]) {
-            delete activeTypingList[sessionUser];
-            io.emit('display typing', activeTypingList);
-        }
-        // NEW: Clean up user from online list
-        if (onlineUsers[socket.id]) {
-            delete onlineUsers[socket.id];
-            io.emit('update users', Object.values(onlineUsers));
-        }
+        console.log('A user disconnected.');
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Feature-Rich Chat Server running on port ${PORT}`);
+    console.log(`Unified Media Chat Server running on port ${PORT}`);
 });
